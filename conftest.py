@@ -1,19 +1,19 @@
 import pytest
-from helpers import register_new_courier_and_return_login_password, get_courier_id, delete_courier
-
+from helpers import generate_random_string
+from api_client import create_courier, login_courier, delete_courier
 
 @pytest.fixture
 def courier():
-    courier_data = register_new_courier_and_return_login_password()
+    login = generate_random_string()
+    password = generate_random_string()
+    first_name = generate_random_string()
+    payload = {"login": login, "password": password, "firstName": first_name}
     
-    if not courier_data:
-        pytest.fail("Не удалось создать курьера для теста")
-
-    yield courier_data
-
-    login = courier_data[0]
-    password = courier_data[1]
+    create_courier(payload)
     
-    courier_id = get_courier_id(login, password)
-    if courier_id:
+    yield login, password
+    
+    response_login = login_courier({"login": login, "password": password})
+    if response_login.status_code == 200:
+        courier_id = response_login.json().get("id")
         delete_courier(courier_id)

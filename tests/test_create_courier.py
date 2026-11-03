@@ -1,44 +1,46 @@
 import allure
 import pytest
-import requests
-import random
-import string
 from urls import Urls
-from helpers import get_courier_id, delete_courier
-
+from helpers import generate_random_string
+from api_client import create_courier, login_courier, delete_courier
 
 @allure.feature("Создание курьера")
 class TestCreateCourier:
 
     @allure.title("Успешное создание курьера")
     def test_create_courier_success(self):
-        login = ''.join(random.choice(string.ascii_lowercase) for i in range(10))
-        password = ''.join(random.choice(string.ascii_lowercase) for i in range(10))
-        
+        login = generate_random_string()
+        password = generate_random_string()
         payload = {
             "login": login,
             "password": password,
             "firstName": "Test"
         }
         
-        response = requests.post(Urls.CREATE_COURIER, data=payload)
+        response = create_courier(payload)
         
         assert response.status_code == 201, f"Ожидался 201, получен {response.status_code}"
         assert response.json() == {"ok": True}
         
-        courier_id = get_courier_id(login, password)
-        if courier_id:
-            delete_courier(courier_id)
+
+        login_payload = {"login": login, "password": password}
+        response_login = login_courier(login_payload)
+        courier_id = response_login.json().get("id")
+        
+        # Убрала if
+        assert courier_id is not None, "Не удалось получить ID созданного курьера"
+        delete_courier(courier_id)
 
     @allure.title("Нельзя создать двух одинаковых курьеров")
     def test_create_duplicate_courier_error(self, courier):
+        login, password = courier
         payload = {
-            "login": courier[0],
-            "password": courier[1],
-            "firstName": courier[2]
+            "login": login,
+            "password": password,
+            "firstName": "Test"
         }
         
-        response = requests.post(Urls.CREATE_COURIER, data=payload)
+        response = create_courier(payload)
         
         assert response.status_code == 409
         assert response.json()["message"] == "Этот логин уже используется"
@@ -53,7 +55,7 @@ class TestCreateCourier:
         }
         del payload[missing_field]
         
-        response = requests.post(Urls.CREATE_COURIER, data=payload)
+        response = create_courier(payload)
         
         assert response.status_code == 400, f"Ожидался 400, получен {response.status_code}"
         assert "Недостаточно данных для создания учетной записи" in response.text
